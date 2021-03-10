@@ -4,7 +4,12 @@
 Your system should be `x86_64`.
 
 Open UEFI mode
-uefi 需要注意VM是否支持（开启？）
+
+Be sure that you have opened the UEFI mode
+
+![](img/setUEFI.png)
+
+
 
 
 
@@ -30,7 +35,7 @@ Set tty font
 setfont /usr/shar/kbd/consolefonts/...
 ```
 
-Maybe `LatGrkCyr-12*22 ` `ter-u22b` is god
+Maybe `LatGrkCyr-12*22 ` or  `ter-u22b` is god
 
 ### system clock
 
@@ -186,17 +191,131 @@ passwd username # set username password
 passwd -d username # you can empty username's password
 ```
 
+If you are using an Intel processor, you should install Intel microcode.
 
-
-
-
-
-
-### packman server
-
-```
-vim /etc/pacman.conf
+```bash
+pacman -S intel-ucode
 ```
 
-enter `mirrorlist` in `[community]` by `gf`
+### Network setting
+
+The network is working now because of preconfiguired `systemd` networking services. We should configure networking services to promise the networking continue to work after VM reboots.
+
+```bash
+systemctl enable systemd-networkd
+systemctl enable systemd-resolved
+```
+
+Show your network names.
+
+```bash
+ip addr
+```
+
+Aside from interface, you can see an additional one, in our case, `ens33`. Then, Edit the file `/etc/systemd/network/20-wired.network` and enter the following.
+
+```
+[Match]
+Name=ens33
+
+[Network]
+DHCP=yes
+```
+
+### GRUB installation
+
+We should install `grub` and `efibootmgr` for setting GRUB. In our case, we use UEFI, so we should install the second one.
+
+```bash
+pacman -S grub efibootmgr
+```
+
+Then, install the `grub bootloader` to `EFI parition`.
+
+```bash
+grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=GRUB
+grub-mkconfig -o /boot/grub/grub.cfg
+```
+
+Reboot your system.
+
+```bash
+exit
+umount -R /mnt
+reboot
+```
+
+If there is no suitable font for you in `/usr/shar/kbd/consolefonts`, you can install font package
+
+```bash
+pacman -S terminus-font
+```
+
+And set your favourite font in `/etc/vconsole.conf`.
+
+```bash
+echo "FONT="ter-u22b"" >> /etc/vconsole.conf
+```
+
+## Desktop environment
+
+### xfce4 installing
+
+Here, we use `xfce4`
+
+The following packages are required:
+
+- [xorg](https://wiki.archlinux.org/index.php/Xorg): A package group that includes the `xorg-server` [display server](https://en.wikipedia.org/wiki/Display_server), a set of applications from `xorg-apps`, and fonts
+- [lightdm](https://wiki.archlinux.org/index.php/LightDM): The [display manager](https://wiki.archlinux.org/index.php/Display_manager), provides a graphical user interface for log in
+- [lightdm-gtk-greeter](https://wiki.archlinux.org/index.php/LightDM#Greeter): The default greeter for `lightdm`
+- [xfce4](https://wiki.archlinux.org/index.php/Xfce): A package group that includes XFCE, the [desktop environment](https://wiki.archlinux.org/index.php/Desktop_environment), as well as supporting packages
+
+```bash
+pacman -S xorg xfce4 lightdm lightdm-gtk-greeter
+```
+
+After installation, enable the lightdm service to start at boot time:
+
+```bash
+systemctl enable lightdm
+```
+
+### dependencies for VM
+
+- [gtk2](https://wiki.archlinux.org/index.php/VMware/Install_Arch_Linux_as_a_guest#Window_resolution_autofit_problems): Fit to window
+- [gtkmm](https://wiki.archlinux.org/index.php/VMware/Install_Arch_Linux_as_a_guest#Window_resolution_autofit_problems): Fit to window
+- [gtkmm3](https://wiki.archlinux.org/index.php/VMware/Install_Arch_Linux_as_a_guest#Drag_and_drop,_copy/paste): Copy and paste
+- [xf86-input-vmmouse](https://wiki.archlinux.org/index.php/VMware/Install_Arch_Linux_as_a_guest#Xorg_configuration): Dependency of Xorg, mouse input tracking
+- [xf86-video-vmware](https://wiki.archlinux.org/index.php/VMware/Install_Arch_Linux_as_a_guest#Xorg_configuration): Dependency of Xorg, fit to window
+- [open-vm-tools](https://wiki.archlinux.org/index.php/VMware/Install_Arch_Linux_as_a_guest#Open-VM-Tools): Drivers/kernel modules and a service that enables communication between the host and guest systems; this package is required for both fit to window and copy and paste functions
+
+Install the above packages with:
+
+```bash
+pacman -S gtk2 gtkmm gtkmm3 xf86-input-vmmouse xf86-video-vmware open-vm-tools
+```
+
+The VMware Tools service, vmtoolsd, needs to be configured to run at boot time. You can do this with the command:
+
+```bash
+systemctl enable vmtoolsd
+```
+
+update initramfs to include VMware modules in `/etc/mkinitcpio.conf`.
+
+```
+MODULES=(vsock vmw_vsock_vmci_transport vmw_balloon vmw_vmci vmwgfx)
+```
+
+After this edit, generate a new initramfs image with:
+
+```bash
+mkinitcpio -P
+```
+
+Reboot and verify os
+
+```bash
+reboot
+```
 
